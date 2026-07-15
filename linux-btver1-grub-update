@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Regenerates GRUB's config to pick up linux-btver1, without ever silently
+# changing what boots by default -- same principle as linux-atom's syslinux
+# hook, adapted for GRUB's very different model (GRUB regenerates its WHOLE
+# menu from scratch and, with the stock GRUB_DEFAULT=0, boots whatever ends
+# up topmost -- which could become our new, as-yet-untested kernel purely by
+# sort order, with no explicit choice involved).
+set -euo pipefail
+
+cfg=/boot/grub/grub.cfg
+defaults=/etc/default/grub
+[ -f "$cfg" ] && [ -f "$defaults" ] || exit 0   # not a GRUB system -- nothing to do
+
+# One-time only: if this machine is still on the stock index-based default,
+# pin it (by title, so it survives future re-sorts/additions) to whatever is
+# currently booting, then switch to saved mode -- so regenerating the menu
+# from here on can never change the default out from under you. Skipped
+# entirely once GRUB_DEFAULT=saved is already set, whether we set it or the
+# machine's owner did, so this never overwrites an intentional later choice.
+if grep -q '^GRUB_DEFAULT=saved$' "$defaults"; then
+  :
+else
+  current_title="$(awk -F"'" '/^menuentry /{print $2; exit}' "$cfg" 2>/dev/null || true)"
+  if [ -n "$current_title" ]; then
+    sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT=saved/' "$defaults"
+    grep -q '^GRUB_SAVEDEFAULT=true$' "$defaults" || echo 'GRUB_SAVEDEFAULT=true' >> "$defaults"
+    grub-set-default "$current_title"
+  fi
+fi
+
+grub-mkconfig -o "$cfg"

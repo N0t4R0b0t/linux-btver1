@@ -1,0 +1,10 @@
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = linux-btver1
+
+[Action]
+Description = Regenerating GRUB config for linux-btver1...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/linux-btver1-grub-update
