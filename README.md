@@ -74,6 +74,15 @@ Re-capture `lsmod` with all your hardware attached — **especially the WiFi
 dongle** — before relying on the slimmed build, and always keep the stock
 kernel as a fallback.
 
+**Applied proactively (2026-07-15), learned the hard way on `linux-atom`
+first**: no USB keyboard/mouse was plugged in when `lsmod.btver1` was
+captured either (only `mac_hid`, a virtual remapping driver, shows up — no
+`usbhid`/`hid_generic` at all). This isn't just "this machine doesn't need
+it" — `mkinitcpio`'s own `keyboard` hook expects `usbhid` to exist and
+**fails the initramfs build without it**. `pkgrel=1` already force-enables
+`CONFIG_USB_HID`/`CONFIG_HID`/`CONFIG_HID_GENERIC`/`CONFIG_USB_HIDDEV` after
+the `localmodconfig` step regardless of what the capture saw.
+
 ## Installing (GRUB, not syslinux)
 
 This machine boots via legacy BIOS GRUB, unlike the Aspire One's syslinux.

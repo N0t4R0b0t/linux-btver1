@@ -55,6 +55,18 @@ prepare() {
   # `SLIM=0 makepkg -s` locally if you need the full config for comparison.
   if [ "${SLIM:-1}" != "0" ]; then
     make LSMOD="$srcdir/lsmod.btver1" localmodconfig
+    # Lesson learned the hard way on linux-atom (2026-07-15): localmodconfig
+    # only keeps what's loaded at lsmod-capture time -- no USB keyboard/mouse
+    # was plugged in when lsmod.btver1 was captured either (only mac_hid, a
+    # virtual remapping driver, shows up; no usbhid/hid_generic at all), and
+    # mkinitcpio's own `keyboard` hook fails the initramfs build without
+    # usbhid ("module not found: usbhid", "the image may not be complete").
+    # Force USB HID support back on regardless of what the capture saw --
+    # it's close to essential (any USB keyboard/mouse, plus early-boot input
+    # generally), not a niche driver worth the aggressive slimming applied
+    # elsewhere. Applying this proactively here, not after a failed install.
+    scripts/config --enable CONFIG_USB_HID --enable CONFIG_HID \
+                    --enable CONFIG_HID_GENERIC --enable CONFIG_USB_HIDDEV
   fi
   make olddefconfig
   make -s kernelrelease > version
