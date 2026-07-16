@@ -48,6 +48,16 @@ prepare() {
   echo "Setting config..."
   cp ../config .config
   scripts/config --set-str CONFIG_LOCALVERSION "-btver1"
+  # linux-atom's config already had CONFIG_DEBUG_INFO_NONE=y; this machine's
+  # own captured config had full DWARF5+BTF debug info enabled instead. Real
+  # consequence, not just build hygiene: BTF/DWARF5 generation blew past a
+  # 10G tmpfs build-scratch mount ("No space left on device" during objcopy's
+  # debug_info extraction) on a container with only 16GB total RAM -- kernel
+  # debug symbols aren't needed for normal use, so disable at the source
+  # (compiler-level) rather than keep growing tmpfs toward the RAM ceiling.
+  scripts/config --disable CONFIG_DEBUG_INFO --disable CONFIG_DEBUG_INFO_BTF \
+                  --disable CONFIG_DEBUG_INFO_BTF_MODULES \
+                  --enable  CONFIG_DEBUG_INFO_NONE
   # Slim to only the modules this machine loads (aggressive; see README). On by
   # default -- an unslimmed build is only useful for local testing outside
   # pkgmirror (which has no reliable way to pass a custom env var like SLIM
