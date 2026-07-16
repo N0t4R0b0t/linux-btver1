@@ -110,3 +110,52 @@ on this install or any future kernel package's regeneration. Select
 "linux-btver1" manually from the GRUB menu to test it; the stock kernel keeps
 booting by default until you explicitly change it (`grub-set-default` or
 `grub-reboot`).
+
+## CPU frequency: the BIOS hides the real turbo state (amdmsrtweaker)
+
+The C-60 is rated for a `1.333GHz` turbo state, but this BIOS's ACPI `_PSS`
+table only ever advertises two P-states to Linux — `1.0GHz` and `800MHz`.
+`acpi-cpufreq` faithfully reports what the table says
+(`cpuinfo_max_freq`/`scaling_max_freq` both cap at `1000000`), so the OS
+never even knows the real turbo state exists. This is a known issue with
+this CPU generation, not specific to this kernel build.
+
+The fix isn't a kernel config option — it's
+[amdmsrtweaker-lnx](https://github.com/johkra/amdmsrtweaker-lnx)
+(`amdmsrt`), which writes AMD's P-state MSRs directly, bypassing what ACPI
+advertises. This **restores already-validated stock silicon behavior**, it's
+not an overclock: `P0=13.3334@1.125 P1=13.3334@1.125 P2=10@1.1 P3=@1.0`
+(`13.3334 × 100MHz = 1.333GHz`, the chip's actual rated turbo). Confirmed
+working: both cores go from a hard-capped `1000MHz` to a genuine `~1330MHz`
+after applying it.
+
+Automated via a systemd oneshot service (not part of this repo — `amdmsrt`
+is a separate third-party tool, machine-specific install path):
+
+```ini
+[Unit]
+Description=Restore AMD C-60 stock turbo P-state (BIOS ACPI _PSS table under-reports it)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/modprobe msr
+ExecStart=/home/hellblazer/amdmsrtweaker-lnx/amdmsrt P0=13.3334@1.125 P1=13.3334@1.125 P2=10@1.1 P3=@1.0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`systemctl enable --now amd-pstate-tweak.service` applies it every boot.
+
+**Thermal caveat, checked and worth taking seriously**: this machine's BIOS
+dates to 2013, and idle CPU temp was already `67-68°C` (`k10temp`'s own
+"high" watermark is `70°C`) *before* applying this fix — likely aged
+thermal paste/dust after over a decade, not something specific to this
+tweak. Even a light single-threaded load after restoring stock turbo pushed
+it to `72.5°C`, past the "high" watermark (still well under the `100°C`
+critical threshold, so not dangerous, just worth noting). **Deliberately not
+pushing beyond the stock-validated values above** — going further into real
+overclock territory on a machine already this thermally tight isn't worth
+it without a physical cleaning first.
