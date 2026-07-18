@@ -23,7 +23,7 @@
 pkgbase=linux-btver1
 pkgname=("$pkgbase")
 pkgver=7.1.3
-pkgrel=1
+pkgrel=2
 _srcname=linux-${pkgver}
 arch=('x86_64')
 url="https://www.kernel.org/"
