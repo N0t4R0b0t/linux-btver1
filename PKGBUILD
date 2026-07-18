@@ -77,6 +77,12 @@ prepare() {
     # elsewhere. Applying this proactively here, not after a failed install.
     scripts/config --enable CONFIG_USB_HID --enable CONFIG_HID \
                     --enable CONFIG_HID_GENERIC --enable CONFIG_USB_HIDDEV
+    # Same lesson, different module: zram was never loaded at lsmod-capture
+    # time (nothing on the machine used it yet), so localmodconfig strips
+    # CONFIG_ZRAM even though the base config had it enabled. zram-generator
+    # then fails at boot with "Module zram not found" -- force it back on
+    # regardless of what the capture saw, same as USB HID above.
+    scripts/config --module CONFIG_ZRAM
   fi
   make olddefconfig
   make -s kernelrelease > version
