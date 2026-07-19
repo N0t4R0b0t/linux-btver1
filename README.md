@@ -111,6 +111,72 @@ on this install or any future kernel package's regeneration. Select
 booting by default until you explicitly change it (`grub-set-default` or
 `grub-reboot`).
 
+## Benchmarks (2026-07-16, real machine)
+
+Compared the tuned+slimmed kernel (`7.1.3-btver1`) against the stock Arch
+kernel (`7.1.3.arch1-3`) on the actual Aspire 725, rebooting between runs and
+letting the machine settle after boot before each pass (same discipline as
+[linux-atom's benchmarks](https://github.com/N0t4R0b0t/linux-atom#benchmarks),
+though the C-60's `1-min` load average never fully quiets down the way the
+idle Aspire One's did — no CPU-heavy process was actually running, so the
+number is boot-decay noise, not real load).
+
+**Raw CPU/crypto/memory throughput — no measurable kernel effect, as
+expected**: `sysbench`/`openssl` are the same tuned userspace binaries on
+both boots (pkgmirror already rebuilds them with `-march=btver1
+-mtune=btver1` regardless of which kernel is running), so any diff here is
+run-to-run noise, not something the kernel choice caused.
+
+| sysbench / openssl | btver1 | stock | diff |
+|---|---|---|---|
+| CPU, 1 thread | 47.03 ev/s | 47.39 ev/s | -0.8% (noise) |
+| CPU, 2 threads | 94.41 ev/s | 93.44 ev/s | +1.0% (noise) |
+| memory | 1,201,260 ops/s | 1,176,648 ops/s | +2.1% (noise) |
+| openssl sha256 (16B) | 7635.5k | 7735.1k | -1.3% (noise) |
+| openssl aes-256-cbc (16B) | 19547.0k | 20410.4k | -4.2% (noise) |
+
+**Memory footprint — real, consistent wins from slimming**, same story as
+`linux-atom`:
+
+| metric | btver1 | stock | diff |
+|---|---|---|---|
+| `vmlinuz` size | 14.0 MB | 16.3 MB | **-14.1%** |
+| Slab | 73,032 kB | 80,184 kB | **-8.9%** |
+| SUnreclaim | 53,868 kB | 65,756 kB | **-18.1%** |
+| KernelStack | 2,880 kB | 3,364 kB | **-14.4%** |
+| PageTables | 4,108 kB | 4,400 kB | -6.6% |
+| SReclaimable | 19,164 kB | 14,428 kB | +32.8% (anomaly, not chased down — opposite direction from the rest of this table, same class of small unexplained outlier as `linux-atom`'s module-memory +2%) |
+| modules loaded | 88 | 90 | 2 fewer |
+| total module memory | 29,324 KiB | 29,536 KiB | -0.7% |
+| `initramfs` size | 14.5 MB | 14.9 MB | -3.0% |
+
+**Scheduler/context-switch behavior — a genuine wash on this run, not a
+repeat of `linux-atom`'s oversubscription win:**
+
+| sysbench threads | btver1 | stock | diff |
+|---|---|---|---|
+| 2 threads/4 locks — events | 14,571 | 13,207 | +10.3% |
+| 2 threads/4 locks — max latency | 19.23ms | 12.36ms | **stock smoother tail** |
+| fork+exec 3000× `/bin/true` — wall time | 10.386s | 10.598s | btver1 ~2% faster |
+| 4 threads/8 locks — events | 4,668 | 4,760 | -1.9% (noise) |
+| 4 threads/8 locks — avg latency | 8.57ms | 8.40ms | +2.0% (noise) |
+
+Unlike the Atom N270 (an in-order core where `CONFIG_MATOM` is a real,
+documented scheduling/alignment win), the Bobcat core in the C-60 doesn't show
+a clean, repeatable effect from kernel-level CPU tuning on this single-pass
+comparison — the contention numbers move in both directions across the two
+tables and stay inside plausible run-to-run noise. The honest takeaway here is
+narrower than `linux-atom`'s: **slimming** (fewer built modules, smaller
+`vmlinuz`/initramfs, less kernel-internal memory overhead) is the real,
+repeatable benefit of this package on the C-60; the `-march=btver1
+-mtune=btver1` kernel build flags themselves don't show a measurable win
+distinct from what the already-tuned userspace packages provide. The turbo
+restore documented below remains the single biggest, clearly-measured
+performance fix on this machine — see the next section.
+
+Raw output saved on the machine under `~/bench/` (`bench-*.txt`, `mem-*.txt`,
+`kernel-bench-*.txt` per kernel version).
+
 ## CPU frequency: the BIOS hides the real turbo state (amdmsrtweaker)
 
 The C-60 is rated for a `1.333GHz` turbo state, but this BIOS's ACPI `_PSS`
