@@ -225,3 +225,28 @@ critical threshold, so not dangerous, just worth noting). **Deliberately not
 pushing beyond the stock-validated values above** — going further into real
 overclock territory on a machine already this thermally tight isn't worth
 it without a physical cleaning first.
+
+## Known wifi hardware incompatibilities on this board
+
+- **Onboard Realtek `rtl8723ae`**: old/unreliable per the machine owner (see
+  `lsmod.btver1` note above) and separately confirmed to hard-hang S3
+  suspend/resume — the driver's power-management path doesn't survive
+  resume cleanly on this chip. Fixed live on the machine with
+  `blacklist rtl8723ae` in `/etc/modprobe.d/`, **not** baked into this repo
+  since the card itself may get physically replaced.
+- **Intel Dual Band Wireless-AC 7260** (Mini PCIe replacement candidate):
+  confirmed incompatible with this board — merely having the card *seated*
+  in the slot (regardless of whether `iwlwifi` is loaded, since PCIe
+  link/ASPM negotiation with the root port happens at enumeration time,
+  independent of any driver binding) causes the embedded controller to
+  fail: `i8042: No controller found` (internal keyboard/touchpad go
+  completely dead) and the AC-adapter online/charging status gets stuck
+  reporting stale state across power transitions. Confirmed by three
+  separate tests: (1) card in, driver loaded — reproduced; (2) card in,
+  driver *not* loaded — still reproduced, ruling out `iwlwifi`/ASPM
+  software behavior as the sole cause; (3) card physically removed,
+  original card reinstalled — fully resolved. This is a board-level
+  incompatibility (likely a shared power rail or PCIe link-state
+  interaction with the EC), not something fixable via kernel config,
+  `iwlwifi` module options, or dropping `pcie_aspm=force` — **do not use
+  this card in this machine.**
