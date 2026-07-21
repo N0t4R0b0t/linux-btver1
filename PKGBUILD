@@ -23,7 +23,7 @@
 pkgbase=linux-btver1
 pkgname=("$pkgbase")
 pkgver=7.1.3
-pkgrel=3
+pkgrel=4
 _srcname=linux-${pkgver}
 arch=('x86_64')
 url="https://www.kernel.org/"
@@ -91,6 +91,14 @@ prepare() {
     # lsusb -t) -- so no USB drive of any kind, USB2 or USB3, is usable.
     # Force it back on regardless of what the capture saw, same as above.
     scripts/config --module CONFIG_USB_STORAGE
+    # Fourth instance, applied proactively this time: a Realtek RTL8821AE
+    # half Mini PCIe card is being installed to replace the flaky onboard
+    # rtl8723ae, but it wasn't present at lsmod-capture time (ordered, not
+    # yet installed), so localmodconfig would strip CONFIG_RTL8821AE the
+    # same way it stripped USB_HID/ZRAM/USB_STORAGE above. Force it on
+    # ahead of time instead of waiting for it to fail after the card
+    # arrives -- same lesson, applied before the fact for once.
+    scripts/config --module CONFIG_RTL8821AE
   fi
   make olddefconfig
   make -s kernelrelease > version
