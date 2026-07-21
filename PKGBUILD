@@ -23,7 +23,7 @@
 pkgbase=linux-btver1
 pkgname=("$pkgbase")
 pkgver=7.1.3
-pkgrel=2
+pkgrel=3
 _srcname=linux-${pkgver}
 arch=('x86_64')
 url="https://www.kernel.org/"
@@ -83,6 +83,14 @@ prepare() {
     # then fails at boot with "Module zram not found" -- force it back on
     # regardless of what the capture saw, same as USB HID above.
     scripts/config --module CONFIG_ZRAM
+    # Third instance of the same lesson: no USB mass-storage device was
+    # plugged in at lsmod-capture time either, so localmodconfig strips
+    # CONFIG_USB_STORAGE. Result: USB drives enumerate fine (xhci_hcd/ehci
+    # are builtin, so the controller and SuperSpeed negotiation both work),
+    # but no driver binds to the Mass Storage interface ("Driver=[none]" in
+    # lsusb -t) -- so no USB drive of any kind, USB2 or USB3, is usable.
+    # Force it back on regardless of what the capture saw, same as above.
+    scripts/config --module CONFIG_USB_STORAGE
   fi
   make olddefconfig
   make -s kernelrelease > version
